@@ -1,10 +1,10 @@
-# Makefile (en el root)
+# Makefile (at root)
 
 NAME=inception
 COMPOSE_FILE=srcs/docker-compose.yml
 ENV_FILE=srcs/.env
 
-# Lee LOGIN desde .env para crear rutas en el host
+# Read LOGIN from .env to create host paths
 LOGIN := $(shell grep '^LOGIN=' $(ENV_FILE) | cut -d'=' -f2)
 
 HOST_MARIADB_DIR := /home/$(LOGIN)/data/mariadb
@@ -14,11 +14,11 @@ all: up
 
 dirs:
 	@mkdir -p $(HOST_MARIADB_DIR) $(HOST_WORDPRESS_DIR)
-	@echo "Rutas de datos listas: $(HOST_MARIADB_DIR), $(HOST_WORDPRESS_DIR)"
+	@echo "Data paths ready: $(HOST_MARIADB_DIR), $(HOST_WORDPRESS_DIR)"
 
 secrets:
-	@test -s secrets/db_root_password.txt || (echo "PON_AQUI_ROOT_PASSWORD" > secrets/db_root_password.txt && echo "=> Rellena secrets/db_root_password.txt")
-	@test -s secrets/db_password.txt || (echo "PON_AQUI_USER_PASSWORD" > secrets/db_password.txt && echo "=> Rellena secrets/db_password.txt")
+	@test -s secrets/db_root_password.txt || (echo "❌ Error: missing secrets/db_root_password.txt" >&2 && exit 1)
+	@test -s secrets/db_password.txt || (echo "❌ Error: missing secrets/db_password.txt" >&2 && exit 1)
 
 build: dirs
 	@docker compose -f $(COMPOSE_FILE) --project-name $(NAME) build
@@ -41,4 +41,6 @@ clean: down
 fclean: clean
 	@sudo rm -rf $(HOST_MARIADB_DIR) $(HOST_WORDPRESS_DIR)
 
-re: fclean all
+re: fclean up
+
+.PHONY: all dirs secrets build up down logs ps clean fclean re

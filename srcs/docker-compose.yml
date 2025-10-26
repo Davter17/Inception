@@ -1,3 +1,5 @@
+
+
 # srcs/docker-compose.yml
 services:
   mariadb:
@@ -64,6 +66,7 @@ services:
 
 networks:
   inception:
+    driver: bridge
 
 secrets:
   db_root_password:
