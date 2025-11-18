@@ -2,18 +2,16 @@
 # srcs/requirements/mariadb/tools/entrypoint.sh
 set -euo pipefail
 
-ROOT_PW_FILE="/run/secrets/db_root_password"
-USER_PW_FILE="/run/secrets/db_password"
-
-if [ ! -s "$ROOT_PW_FILE" ] || [ ! -s "$USER_PW_FILE" ]; then
-  echo "Faltan secretos de DB: $ROOT_PW_FILE o $USER_PW_FILE"
-  exit 1
-fi
-
-MYSQL_ROOT_PASSWORD="$(cat "$ROOT_PW_FILE")"
-MYSQL_PASSWORD="$(cat "$USER_PW_FILE")"
+# Usar variables de entorno directamente
+MYSQL_ROOT_PASSWORD="${ROOT_PASSWORD}"
+MYSQL_PASSWORD="${USER_PASSWORD}"
 MYSQL_DATABASE="${MYSQL_DATABASE:-wordpress}"
 MYSQL_USER="${MYSQL_USER:-wp_user}"
+
+if [ -z "$MYSQL_ROOT_PASSWORD" ] || [ -z "$MYSQL_PASSWORD" ]; then
+  echo "Error: ROOT_PASSWORD o USER_PASSWORD no están definidas"
+  exit 1
+fi
 
 # Asegurar sockets/dirs
 mkdir -p /run/mysqld

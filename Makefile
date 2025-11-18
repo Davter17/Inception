@@ -16,14 +16,10 @@ dirs:
 	@mkdir -p $(HOST_MARIADB_DIR) $(HOST_WORDPRESS_DIR)
 	@echo "Data paths ready: $(HOST_MARIADB_DIR), $(HOST_WORDPRESS_DIR)"
 
-secrets:
-	@test -s secrets/db_root_password.txt || (echo "❌ Error: missing secrets/db_root_password.txt" >&2 && exit 1)
-	@test -s secrets/db_password.txt || (echo "❌ Error: missing secrets/db_password.txt" >&2 && exit 1)
-
 build: dirs
 	@docker compose -f $(COMPOSE_FILE) --project-name $(NAME) build
 
-up: secrets build
+up: build
 	@docker compose -f $(COMPOSE_FILE) --project-name $(NAME) up -d
 
 down:
@@ -43,4 +39,4 @@ fclean: clean
 
 re: fclean up
 
-.PHONY: all dirs secrets build up down logs ps clean fclean re
+.PHONY: all dirs build up down logs ps clean fclean re

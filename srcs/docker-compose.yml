@@ -1,5 +1,3 @@
-
-
 # srcs/docker-compose.yml
 services:
   mariadb:
@@ -9,25 +7,23 @@ services:
       dockerfile: Dockerfile
     image: mariadb        # mismo nombre que el servicio
     env_file: .env
-    secrets:
-      - db_root_password
-      - db_password
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
-      # Las contraseñas se leen dentro del entrypoint desde /run/secrets/*
+      - ROOT_PASSWORD=${ROOT_PASSWORD}
+      - USER_PASSWORD=${USER_PASSWORD}
     volumes:
       - ${HOST_MARIADB_DIR}:/var/lib/mysql
     networks:
       - inception
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping --silent --protocol=socket || mariadb-admin ping --silent -h 127.0.0.1"]
+      test: ["CMD-SHELL", "mysqladmin ping --socket=/run/mysqld/mysqld.sock --silent || exit 1"]
       interval: 5s
       timeout: 3s
       retries: 30
 
-  # placeholders para el resto (los completaremos luego)
+  # placeholders para el resto (los completaremos luego) 
   nginx:
     container_name: nginx
     build:
@@ -35,7 +31,7 @@ services:
       dockerfile: Dockerfile
     image: nginx
     ports:
-      - "8443:443"
+      - "443:443" # 8443 mapeado a 443 del contenedor para el local de 42
     volumes:
       - ${HOST_WORDPRESS_DIR}:/var/www/html
     networks: [inception]
@@ -51,11 +47,16 @@ services:
       dockerfile: Dockerfile
     image: wordpress
     env_file: .env
-    secrets:
-      - db_password
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
+      - USER_PASSWORD=${USER_PASSWORD}
+      - WP_ADMIN_USER=${WP_ADMIN_USER}
+      - WP_ADMIN_PASSWORD=${WP_ADMIN_PASSWORD}
+      - WP_ADMIN_EMAIL=${WP_ADMIN_EMAIL}
+      - WP_USER=${WP_USER}
+      - WP_USER_EMAIL=${WP_USER_EMAIL}
+      - WP_USER_PASSWORD=${WP_USER_PASSWORD}
     volumes:
       - ${HOST_WORDPRESS_DIR}:/var/www/html
     networks: [inception]
@@ -67,9 +68,3 @@ services:
 networks:
   inception:
     driver: bridge
-
-secrets:
-  db_root_password:
-    file: ../secrets/db_root_password.txt
-  db_password:
-    file: ../secrets/db_password.txt
