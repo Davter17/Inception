@@ -1,15 +1,5 @@
-# srcs/requirements/mariadb/conf/50-server.cnf
 [mysqld]
 bind-address=0.0.0.0
-port=3306
-datadir=/var/lib/mysql
-socket=/run/mysqld/mysqld.sock
-pid-file=/run/mysqld/mysqld.pid
-
-# Mejoras comunes
 skip-name-resolve
-character-set-server = utf8mb4
-collation-server      = utf8mb4_unicode_ci
-
-# Logs mínimos en consola
-log_error=/var/log/mysql/error.log
+character-set-server=utf8mb4
+collation-server=utf8mb4_unicode_ci

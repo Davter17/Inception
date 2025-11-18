@@ -1,24 +1,23 @@
-# srcs/requirements/nginx/Dockerfile
+#Use Debian Bookworm as the base image
 FROM debian:bookworm
 
-# Instalar Nginx y OpenSSL para generar certificados
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      nginx \
-      openssl \
-      ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+# Update package lists and install nginx and openssl
+RUN apt-get update && \ 
+    apt-get install -y --no-install-recommends nginx openssl && \ 
+    rm -rf /var/lib/apt/lists/*	
 
-# Copiar configuración personalizada
+# Copy custom nginx configuration file into the container
 COPY conf/nginx.conf /etc/nginx/nginx.conf
 
-# Crear directorio para SSL y generar certificados auto-firmados
-RUN mkdir -p /etc/nginx/ssl && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/ssl/cert.key \
-    -out /etc/nginx/ssl/cert.crt \
-    -subj "/C=ES/ST=Madrid/L=Madrid/O=42/OU=student/CN=mpico-bu.42.fr"
+# Generate self-signed SSL certificate
+RUN mkdir -p /etc/nginx/ssl && \ 
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \ 
+    -keyout /etc/nginx/ssl/cert.key \ 
+    -out /etc/nginx/ssl/cert.crt \ 
+    -subj "/CN=mpico-bu.42.fr"
 
+# Expose ports 443, only info about HTTPS
 EXPOSE 443
 
+# Set nginx to run in the foreground when the container starts
 ENTRYPOINT ["nginx", "-g", "daemon off;"]

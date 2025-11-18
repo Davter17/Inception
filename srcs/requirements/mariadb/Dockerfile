@@ -1,25 +1,21 @@
-# srcs/requirements/mariadb/Dockerfile
+# Use Debian Bookworm as the base image
 FROM debian:bookworm
 
-# No usamos latest (prohibido). Instalamos mariadb-server.
+# Install MariaDB server and client
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      mariadb-server mariadb-client ca-certificates && \
+    apt-get install -y --no-install-recommends mariadb-server mariadb-client && \
     rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/lib/mysql/* && \
     mkdir -p /var/lib/mysql && \
     chown -R mysql:mysql /var/lib/mysql
 
-# Configuración
+# Copy custom MariaDB configuration and entrypoint script into the container
 COPY conf/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf
-
-# Entrypoint propio (nada de loops infinitos)
 COPY tools/entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# Make the entrypoint script executable
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# MariaDB data dir como volumen (se monta desde el host vía compose)
-VOLUME ["/var/lib/mysql"]
-
-EXPOSE 3306
-
+# Set the default command to run MariaDB
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["mariadbd", "--user=mysql", "--console"]

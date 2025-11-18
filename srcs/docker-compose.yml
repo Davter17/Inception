@@ -13,7 +13,7 @@ services:
       - ROOT_PASSWORD=${ROOT_PASSWORD}
       - USER_PASSWORD=${USER_PASSWORD}
     volumes:
-      - ${HOST_MARIADB_DIR}:/var/lib/mysql
+      - mariadb_data:/var/lib/mysql
     networks:
       - inception
     restart: always
@@ -33,7 +33,7 @@ services:
     ports:
       - "443:443" # 8443 mapeado a 443 del contenedor para el local de 42
     volumes:
-      - ${HOST_WORDPRESS_DIR}:/var/www/html
+      - wordpress_data:/var/www/html
     networks: [inception]
     restart: always
     depends_on:
@@ -58,7 +58,7 @@ services:
       - WP_USER_EMAIL=${WP_USER_EMAIL}
       - WP_USER_PASSWORD=${WP_USER_PASSWORD}
     volumes:
-      - ${HOST_WORDPRESS_DIR}:/var/www/html
+      - wordpress_data:/var/www/html
     networks: [inception]
     restart: always
     depends_on:
@@ -68,3 +68,17 @@ services:
 networks:
   inception:
     driver: bridge
+
+volumes:
+  mariadb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/mpico-bu/data/mariadb
+  wordpress_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/mpico-bu/data/wordpress
