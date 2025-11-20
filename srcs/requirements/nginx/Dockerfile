@@ -9,15 +9,12 @@ RUN apt-get update && \
 # Copy custom nginx configuration file into the container
 COPY conf/nginx.conf /etc/nginx/nginx.conf
 
-# Generate self-signed SSL certificate
-RUN mkdir -p /etc/nginx/ssl && \ 
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \ 
-    -keyout /etc/nginx/ssl/cert.key \ 
-    -out /etc/nginx/ssl/cert.crt \ 
-    -subj "/CN=mpico-bu.42.fr"
+# Copy entrypoint script
+COPY tools/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Expose ports 443, only info about HTTPS
 EXPOSE 443
 
 # Set nginx to run in the foreground when the container starts
-ENTRYPOINT ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -1,11 +1,10 @@
-# srcs/docker-compose.yml
 services:
   mariadb:
     container_name: mariadb
     build:
       context: ./requirements/mariadb
       dockerfile: Dockerfile
-    image: mariadb        # mismo nombre que el servicio
+    image: mariadb
     env_file: .env
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
@@ -23,23 +22,6 @@ services:
       timeout: 3s
       retries: 30
 
-  # placeholders para el resto (los completaremos luego) 
-  nginx:
-    container_name: nginx
-    build:
-      context: ./requirements/nginx
-      dockerfile: Dockerfile
-    image: nginx
-    ports:
-      - "443:443" # 8443 mapeado a 443 del contenedor para el local de 42
-    volumes:
-      - wordpress_data:/var/www/html
-    networks: [inception]
-    restart: always
-    depends_on:
-      wordpress:
-        condition: service_started
-
   wordpress:
     container_name: wordpress
     build:
@@ -48,6 +30,7 @@ services:
     image: wordpress
     env_file: .env
     environment:
+      - LOGIN=${LOGIN}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
       - USER_PASSWORD=${USER_PASSWORD}
@@ -59,11 +42,32 @@ services:
       - WP_USER_PASSWORD=${WP_USER_PASSWORD}
     volumes:
       - wordpress_data:/var/www/html
-    networks: [inception]
+    networks:
+      - inception
     restart: always
     depends_on:
       mariadb:
         condition: service_healthy
+
+  nginx:
+    container_name: nginx
+    build:
+      context: ./requirements/nginx
+      dockerfile: Dockerfile
+    image: nginx
+    env_file: .env
+    environment:
+      - LOGIN=${LOGIN}
+    ports:
+      - "443:443"
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - inception
+    restart: always
+    depends_on:
+      wordpress:
+        condition: service_started
 
 networks:
   inception:
@@ -75,10 +79,10 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/mpico-bu/data/mariadb
+      device: /home/$(LOGIN)/data/mariadb
   wordpress_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /home/mpico-bu/data/wordpress
+      device: /home/$(LOGIN)/data/wordpress

@@ -54,6 +54,7 @@ ENV_FILE=srcs/.env
 LOGIN := $(shell grep '^LOGIN=' $(ENV_FILE) | cut -d'=' -f2)
   - Extrae el nombre de usuario desde el archivo .env
   - Se usa para construir las rutas de los directorios de datos
+  -d '=' -f2: Obtiene la segunda parte después del '='
 
 HOST_MARIADB_DIR := /home/$(LOGIN)/data/mariadb
   - Directorio en el host donde se almacenan los datos de MariaDB
@@ -74,12 +75,14 @@ make dirs
   - Crea los directorios necesarios para los volúmenes de datos
   - Directorios: $(HOST_MARIADB_DIR) y $(HOST_WORDPRESS_DIR)
   - Muestra un mensaje confirmando las rutas creadas
+  - -p opción: crea directorios padres si no existen
 
 make build
   - Dependencia: make dirs
   - Construye las imágenes Docker definidas en docker-compose.yml
   - Usa el nombre del proyecto especificado en $(NAME)
   - No inicia los contenedores
+  - -f opción: especifica el archivo docker-compose.yml
 
 make up
   - Dependencia: make build
@@ -111,7 +114,7 @@ make re
 
 
 PHONY TARGETS:
-.PHONY: all dirs build up down logs ps clean fclean re
+.PHONY: all dirs build up down clean fclean re
   - Declara que estos targets no corresponden a archivos reales
   - Asegura que make siempre ejecute estos comandos
 
@@ -168,37 +171,9 @@ SERVICIOS:
        - Número de intentos antes de marcar como unhealthy
 
 
-2. SERVICIO NGINX
-   container_name: nginx
-     - Nombre fijo del contenedor
-   
-   build:
-     context: ./requirements/nginx
-     dockerfile: Dockerfile
-   
-   image: nginx
-   
-   ports:
-     - "443:443"
-     - Mapea el puerto 443 del host al puerto 443 del contenedor
-     - Permite acceso HTTPS desde el exterior
-   
-   volumes:
-     - wordpress_data:/var/www/html
-     - Comparte los archivos de WordPress con NGINX
-   
-   networks: [inception]
-   
-   restart: always
-   
-   depends_on:
-     wordpress:
-       condition: service_started
-     - NGINX solo inicia después de que WordPress esté iniciado
-
-
-3. SERVICIO WORDPRESS
+2. SERVICIO WORDPRESS
    container_name: wordpress
+     - Nombre fijo del contenedor
    
    build:
      context: ./requirements/wordpress
@@ -207,8 +182,10 @@ SERVICIOS:
    image: wordpress
    
    env_file: .env
+     - Carga variables de entorno desde el archivo .env
    
    environment:
+     - LOGIN: Nombre de usuario para generar la URL dinámica
      - MYSQL_DATABASE: Nombre de la base de datos
      - MYSQL_USER: Usuario de la base de datos
      - USER_PASSWORD: Contraseña del usuario de la base de datos
@@ -223,7 +200,8 @@ SERVICIOS:
      - wordpress_data:/var/www/html
      - Almacena los archivos de WordPress de forma persistente
    
-   networks: [inception]
+   networks:
+     - inception
    
    restart: always
    
@@ -231,6 +209,42 @@ SERVICIOS:
      mariadb:
        condition: service_healthy
      - WordPress espera a que MariaDB esté completamente operativo
+
+
+3. SERVICIO NGINX
+   container_name: nginx
+     - Nombre fijo del contenedor
+   
+   build:
+     context: ./requirements/nginx
+     dockerfile: Dockerfile
+   
+   image: nginx
+   
+   env_file: .env
+     - Carga variables de entorno desde el archivo .env
+   
+   environment:
+     - LOGIN: Nombre de usuario para generar certificado SSL y server_name dinámico
+   
+   ports:
+     - "443:443"
+     - Mapea el puerto 443 del host al puerto 443 del contenedor
+     - Permite acceso HTTPS desde el exterior
+   
+   volumes:
+     - wordpress_data:/var/www/html
+     - Comparte los archivos de WordPress con NGINX
+   
+   networks:
+     - inception
+   
+   restart: always
+   
+   depends_on:
+     wordpress:
+       condition: service_started
+     - NGINX solo inicia después de que WordPress esté iniciado
 
 
 REDES:
@@ -254,14 +268,13 @@ mariadb_data:
       - Monta un directorio del host
     device: /home/mpico-bu/data/mariadb
       - Ruta en el host donde se almacenan los datos
-      - NOTA: Esta ruta debería usar la variable $(LOGIN)
 
 wordpress_data:
   driver: local
   driver_opts:
     type: none
     o: bind
-    device: /home/mpico-bu/data/wordpress
+    device: /home/$(LOGIN)/data/wordpress
       - Ruta en el host para los archivos de WordPress
 
 
@@ -276,6 +289,11 @@ FROM debian:bookworm
   - Imagen base: Debian 12 (Bookworm)
   - Sistema operativo estable y ligero
 
+ARG LOGIN=mpico-bu
+  - Define un argumento de build para el nombre de usuario
+  - Valor por defecto: mpico-bu
+  - Se pasa desde docker-compose.yml
+
 RUN apt-get update && apt-get install -y --no-install-recommends nginx openssl
   - Actualiza los repositorios de paquetes
   - Instala NGINX (servidor web) y OpenSSL (para certificados SSL)
@@ -287,29 +305,57 @@ rm -rf /var/lib/apt/lists/*
 
 COPY conf/nginx.conf /etc/nginx/nginx.conf
   - Copia la configuración personalizada de NGINX al contenedor
+  - Contiene ${LOGIN} como placeholder que será reemplazado en runtime
 
-RUN mkdir -p /etc/nginx/ssl
-  - Crea el directorio para los certificados SSL
+COPY tools/entrypoint.sh /usr/local/bin/entrypoint.sh
+  - Copia el script de inicialización al contenedor
 
-openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-    -keyout /etc/nginx/ssl/cert.key \
-    -out /etc/nginx/ssl/cert.crt \
-    -subj "/CN=mpico-bu.42.fr"
-  - Genera un certificado SSL autofirmado:
-    * -x509: Formato de certificado X.509
-    * -nodes: No cifra la clave privada (no nodes = no DES)
-    * -days 365: Válido por 1 año
-    * -newkey rsa:2048: Genera una nueva clave RSA de 2048 bits
-    * -keyout: Ruta de la clave privada
-    * -out: Ruta del certificado
-    * -subj: Nombre común del certificado (CN)
+RUN chmod +x /usr/local/bin/entrypoint.sh
+  - Hace el script ejecutable
 
 EXPOSE 443
   - Documenta que el contenedor escucha en el puerto 443
   - Solo es informativo, no abre el puerto
 
-ENTRYPOINT ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+  - Ejecuta el script de inicialización al arrancar el contenedor
+  - El script genera el certificado SSL dinámicamente
+  - Reemplaza variables en nginx.conf
+  - Inicia NGINX en primer plano
+
+
+SCRIPT DE INICIALIZACIÓN (requirements/nginx/tools/entrypoint.sh):
+-----------------------------------------------------------------
+
+#!/bin/bash
+set -e
+  - Sale si cualquier comando falla
+
+mkdir -p /etc/nginx/ssl
+  - Crea el directorio para los certificados SSL
+
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/nginx/ssl/cert.key \
+  -out /etc/nginx/ssl/cert.crt \
+  -subj "/CN=${LOGIN}.42.fr"
+  - Genera un certificado SSL autofirmado dinámicamente:
+    * Usa la variable de entorno ${LOGIN}
+    * -x509: Formato de certificado X.509
+    * -nodes: No cifra la clave privada
+    * -days 365: Válido por 1 año
+    * -newkey rsa:2048: Genera una nueva clave RSA de 2048 bits
+    * -keyout: Ruta de la clave privada
+    * -out: Ruta del certificado
+    * -subj: Nombre común del certificado (CN) dinámico
+
+sed -i "s/\${LOGIN}/${LOGIN}/g" /etc/nginx/nginx.conf
+  - Reemplaza el placeholder ${LOGIN} en nginx.conf con el valor real
+  - -i: Edita el archivo in-place
+  - Permite tener server_name dinámico basado en la variable de entorno
+
+exec nginx -g "daemon off;"
   - Ejecuta NGINX en primer plano (daemon off)
+  - exec: Reemplaza el proceso actual
   - Necesario para que Docker mantenga el contenedor activo
 
 
@@ -334,8 +380,9 @@ http {
         listen 443 ssl;
           - Escucha en el puerto 443 con SSL habilitado
         
-        server_name mpico-bu.42.fr;
-          - Nombre del servidor (dominio)
+        server_name ${LOGIN}.42.fr;
+          - Nombre del servidor (dominio) dinámico
+          - ${LOGIN} es reemplazado por el entrypoint.sh con el valor real
         
         ssl_protocols TLSv1.2 TLSv1.3;
           - Protocolos SSL/TLS permitidos
@@ -649,14 +696,14 @@ if [ ! -f /var/www/html/wp-config.php ]; then
       * Host de la base de datos (nombre del servicio + puerto)
 
   wp core install \
-    --url="https://mpico-bu.42.fr" \
+    --url="https://${LOGIN}.42.fr" \
     --title="Inception" \
     --admin_user="$WP_ADMIN_USER" \
     --admin_password="$WP_ADMIN_PASSWORD" \
     --admin_email="$WP_ADMIN_EMAIL" \
     --allow-root
     - Instala WordPress:
-      * URL del sitio
+      * URL del sitio (dinámica basada en variable LOGIN)
       * Título del sitio
       * Usuario administrador
       * Contraseña del administrador
@@ -802,6 +849,12 @@ ESTRUCTURA DEL ARCHIVO .env (ejemplo):
 
 # Información del usuario
 LOGIN=mpico-bu
+  - Nombre de usuario del sistema
+  - Usado para:
+    * Construir rutas de volúmenes en el Makefile
+    * Generar URL dinámica de WordPress
+    * Generar certificado SSL con dominio dinámico
+    * Configurar server_name en NGINX
 
 # Configuración de la base de datos
 MYSQL_DATABASE=wordpress
@@ -825,7 +878,12 @@ DESCRIPCIÓN DE VARIABLES:
 
 LOGIN:
   - Nombre de usuario en el sistema
-  - Usado para construir rutas de volúmenes
+  - Usado para:
+    * Construir rutas de volúmenes (/home/LOGIN/data/...)
+    * Generar URL de WordPress (https://LOGIN.42.fr)
+    * Generar certificado SSL con CN=LOGIN.42.fr
+    * Configurar server_name en NGINX
+  - IMPORTANTE: Debe coincidir con tu login de 42
 
 MYSQL_DATABASE:
   - Nombre de la base de datos a crear
@@ -911,16 +969,24 @@ CUANDO SE EJECUTA "make up":
      c) Ejecuta entrypoint.sh
      d) Si es primera vez:
         - Descarga WordPress
-        - Crea wp-config.php
-        - Instala WordPress
+        - Crea wp-config.php con credenciales de BD
+        - Instala WordPress con URL dinámica (https://${LOGIN}.42.fr)
         - Crea usuario adicional
      e) Inicia PHP-FPM en puerto 9000
 
    PASO 3 - NGINX inicia (espera a que WordPress esté started):
      a) Crea contenedor nginx
-     b) Monta volumen wordpress_data (solo lectura implícita)
-     c) Inicia nginx en puerto 443
-     d) Expone puerto 443 al host
+     b) Monta volumen wordpress_data (compartido con wordpress)
+     c) Ejecuta entrypoint.sh
+     d) El entrypoint:
+        - Genera certificado SSL con CN=${LOGIN}.42.fr
+        - Reemplaza ${LOGIN} en nginx.conf
+     e) Inicia nginx en puerto 443
+     f) Expone puerto 443 al host
+
+4. Sistema listo
+   - Accesible en https://${LOGIN}.42.fr (ej: https://mpico-bu.42.fr)
+   - NGINX sirve archivos estáticos y proxy de PHP a WordPress
 
 4. Sistema listo
    - Accesible en https://mpico-bu.42.fr

@@ -41,4 +41,4 @@ fclean: clean
 # Rebuild everything from scratch
 re: fclean up
 
-.PHONY: all dirs build up down logs ps clean fclean re
+.PHONY: all dirs build up down clean fclean re

@@ -23,7 +23,7 @@ if [ ! -f /var/www/html/wp-config.php ]; then
   
   # Install WordPress with site details
   wp core install \
-    --url="https://mpico-bu.42.fr" \
+    --url="https://$(LOGIN).42.fr" \
     --title="Inception" \
     --admin_user="$WP_ADMIN_USER" \
     --admin_password="$WP_ADMIN_PASSWORD" \

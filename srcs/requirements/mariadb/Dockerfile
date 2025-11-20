@@ -18,4 +18,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Set the default command to run MariaDB
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+
+# Start MariaDB server with specified user and console output
 CMD ["mariadbd", "--user=mysql", "--console"]
